@@ -4,7 +4,7 @@
 #define mqtt_user "iot"
 #define mqtt_password "test123"
 
-#define topic "Waschkueche"
+#define topic "Gewaechshaus"
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -53,19 +53,16 @@ bsError jsonLine(char* outstr, const char* identifier, const float value, const 
 
 void mqttPublishStatus(status_t *status) {
   char buffer[512];
+  buffer[0] = '\0';
   char tempBuffer[64];
   //sprintf(buffer, "{\"WaschkuecheTemperaturInnen\": %f}", status->insideTemperature, status->insideHumidity, status->insideDewPoint, status->outsideTemperature, status->outsideHumidity, status->outsideDewPoint);
-  jsonLine(tempBuffer, "WaschkuecheTemperaturInnen", status->insideTemperature, false);
+  jsonLine(tempBuffer, "GewaechshausTemperatur", status->insideTemperature, false);
   sprintf(buffer, "%s%s", buffer, tempBuffer);
-  jsonLine(tempBuffer, "WaschkuecheLuftfeuchtigkeitInnen", status->insideHumidity, false);
+  jsonLine(tempBuffer, "GewaechshausLuftfeuchtigkeit", status->insideHumidity, false);
   sprintf(buffer, "%s%s", buffer, tempBuffer);
-  jsonLine(tempBuffer, "WaschkuecheTaupunktInnen", status->insideDewPoint, false);
+  jsonLine(tempBuffer, "GewaechshausTaupunkt", status->insideDewPoint, false);
   sprintf(buffer, "%s%s", buffer, tempBuffer);
-  jsonLine(tempBuffer, "WaschkuecheTemperaturAussen", status->outsideTemperature, false);
-  sprintf(buffer, "%s%s", buffer, tempBuffer);
-  jsonLine(tempBuffer, "WaschkuecheLuftfeuchtigkeitAussen", status->outsideHumidity, false);
-  sprintf(buffer, "%s%s", buffer, tempBuffer);
-  jsonLine(tempBuffer, "WaschkuecheTaupunktAussen", status->outsideDewPoint, true);
+  jsonLine(tempBuffer, "GewaechshausBatterieSpannung", status->batteryVoltage, true);
   sprintf(buffer, "%s%s", buffer, tempBuffer);
   wrapIntoJson(buffer, buffer);
   client.publish(topic, buffer, true);
