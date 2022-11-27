@@ -5,6 +5,7 @@
 #include <DNSServer.h>
 #include <WiFiManager.h>
 #include <PubSubClient.h>
+#include <EEPROM.h>
 
 #include "dht22.h"
 #include "status.h"
@@ -14,11 +15,13 @@
 
 #define WIFI_HOTSPOT_NAME "Gewaechshaus_Sensor"
 
-#define mqtt_server "192.168.0.2"
-#define mqtt_user "iot"
-#define mqtt_password "test123"
+#define FORCE_UPDATE_AFTER_X_BOOTUPS 10
+#define FLASH_ADDRESS_ACTIVATIONS_WITHOUT_UPDATE 0
 
-#define topic "Gewaechshaus"
+#define SIGNIFICANT_DIFFERENCE_TEMPERATURE 0.1
+#define SIGNIFICANT_DIFFERENCE_HUMIDITY 0.1
+#define SIGNIFICANT_DIFFERENCE_BATTERY_VOLTAGE 0.1
+#define FLASH_ADDRESS_OLD_VALUES 2
 
 status_t status;
 BatteryMonitor batteryMonitor;
@@ -44,24 +47,43 @@ void _checkUndervoltage() {
   }
 }
 
+bool _haveValuesChangedSignificantly(const status_t* const status) {
+  status_t oldValues;
+  EEPROM.begin(sizeof(oldValues));
+  EEPROM.get(FLASH_ADDRESS_OLD_VALUES, oldValues);
+  Serial.printf("Last Values: T=%.2f, H=%.2f, Vb=%.2f\n", oldValues.insideTemperature, oldValues.insideHumidity, oldValues.batteryVoltage);
+  return (
+    (abs(oldValues.insideTemperature - status->insideTemperature) > SIGNIFICANT_DIFFERENCE_TEMPERATURE) ||
+    (abs(oldValues.insideHumidity - status->insideHumidity) > SIGNIFICANT_DIFFERENCE_HUMIDITY) ||
+    (abs(oldValues.batteryVoltage - status->batteryVoltage) > SIGNIFICANT_DIFFERENCE_BATTERY_VOLTAGE)
+  );
+}
+
+void _storeCurrentValues(const status_t* const status) {
+  EEPROM.begin(sizeof(status_t));
+  EEPROM.put(FLASH_ADDRESS_OLD_VALUES, status);
+  EEPROM.commit();
+}
+
 void setup()
 {
+  led.setup(LED_BUILTIN);
   led.off();
   Serial.begin(115200);
   batteryMonitor.getVoltage(&status);
   _checkUndervoltage();
   dht.setup();
-  led.setup(LED_BUILTIN);
+  dht.getValues(&status);
+  //_haveValuesChangedSignificantly(&status);
+  //_storeCurrentValues(&status);
   wifiConnection();
   mqttSetup();
 }
 
-void loop()
-{
+void loop() {
   reconnect();
 
   led.flash();
-  dht.getValues(&status);
   batteryMonitor.getVoltage(&status);
   Serial.printf("T=%.2f, H=%.2f, Vb=%.2f\n", status.insideTemperature, status.insideHumidity, status.batteryVoltage);
   
@@ -71,5 +93,5 @@ void loop()
   mqttPublish(buffer);
   delay(100);
   //mqttPublishStatus(&status);
-  ESP.deepSleep(60e6);  // reset after 60s
+  ESP.deepSleep(300e6);  // reset after 5mins
 }
