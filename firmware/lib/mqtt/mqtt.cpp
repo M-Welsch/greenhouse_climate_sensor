@@ -9,22 +9,24 @@
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+#define MAXIMUM_CONNECTION_TRIALS 5
+
 void mqttSetup() {
     client.setServer(mqtt_server, 1883);   
 }
 
 void reconnect() {
   client.loop();
-  while (!client.connected()) {
+  uint8_t connectionTrials = 0;
+  while (!client.connected() && (connectionTrials < MAXIMUM_CONNECTION_TRIALS)) {
     Serial.print("Attempting MQTT connection...");
     if (client.connect("ESP8266Client", mqtt_user, mqtt_password)) {
       Serial.println("connected");
     } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
+      Serial.printf("failed, rc=%d. Trying again in 5 seconds\n", client.state());
       delay(5000);
     }
+    connectionTrials++;
   }
 }
 

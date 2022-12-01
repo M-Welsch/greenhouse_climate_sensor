@@ -16,12 +16,12 @@
 #define WIFI_HOTSPOT_NAME "Gewaechshaus_Sensor"
 
 #define FORCE_UPDATE_AFTER_X_BOOTUPS 10
-#define FLASH_ADDRESS_ACTIVATIONS_WITHOUT_UPDATE 0
+#define FLASH_ADDRESS_ACTIVATIONS_WITHOUT_UPDATE 64
 
 #define SIGNIFICANT_DIFFERENCE_TEMPERATURE 0.1
 #define SIGNIFICANT_DIFFERENCE_HUMIDITY 0.1
 #define SIGNIFICANT_DIFFERENCE_BATTERY_VOLTAGE 0.1
-#define FLASH_ADDRESS_OLD_VALUES 2
+#define FLASH_ADDRESS_OLD_VALUES 0
 
 #define BUTTON 13
 
@@ -60,27 +60,33 @@ void _checkUndervoltage() {
   }
 }
 
+bool _hasValueChanged(float oldVal, float newVal, float maxDiff) {
+  bool hasChanged = abs(oldVal - newVal) > maxDiff;
+  Serial.printf("old: %f, new: %f: %d\n", oldVal, newVal, hasChanged);
+  return hasChanged;
+}
+
 bool _haveValuesChangedSignificantly(const status_t* const status) {
   status_t oldValues;
-  EEPROM.begin(sizeof(oldValues));
   EEPROM.get(FLASH_ADDRESS_OLD_VALUES, oldValues);
   Serial.printf("Last Values: T=%.2f, H=%.2f, Vb=%.2f\n", oldValues.insideTemperature, oldValues.insideHumidity, oldValues.batteryVoltage);
-  return (
-    (abs(oldValues.insideTemperature - status->insideTemperature) > SIGNIFICANT_DIFFERENCE_TEMPERATURE) ||
-    (abs(oldValues.insideHumidity - status->insideHumidity) > SIGNIFICANT_DIFFERENCE_HUMIDITY) ||
-    (abs(oldValues.batteryVoltage - status->batteryVoltage) > SIGNIFICANT_DIFFERENCE_BATTERY_VOLTAGE)
-  );
+  bool tempChanged = _hasValueChanged(oldValues.insideTemperature, status->insideTemperature, SIGNIFICANT_DIFFERENCE_TEMPERATURE);
+  bool humChanged = _hasValueChanged(oldValues.insideHumidity, status->insideHumidity, SIGNIFICANT_DIFFERENCE_HUMIDITY);
+  bool vbatChanged = _hasValueChanged(oldValues.batteryVoltage, status->batteryVoltage, SIGNIFICANT_DIFFERENCE_BATTERY_VOLTAGE);
+  return (tempChanged || humChanged || vbatChanged);
 }
 
 void _storeCurrentValues(const status_t* const status) {
-  EEPROM.begin(sizeof(status_t));
+  Serial.printf("Writing these to flash: T=%.2f, H=%.2f, Vb=%.2f\n", status->insideTemperature, status->insideHumidity, status->batteryVoltage);
   EEPROM.put(FLASH_ADDRESS_OLD_VALUES, status);
   EEPROM.commit();
+  EEPROM.end();
 }
 
 void setup()
 {
   Serial.begin(115200);
+  Serial.println();
   pinMode(BUTTON, INPUT_PULLUP);
   bool openHotspot = !digitalRead(BUTTON);
   led.setup(LED_BUILTIN);
@@ -89,8 +95,9 @@ void setup()
   _checkUndervoltage();
   dht.setup();
   dht.getValues(&status);
-  //_haveValuesChangedSignificantly(&status);
-  //_storeCurrentValues(&status);
+  EEPROM.begin(sizeof(status_t));
+  _haveValuesChangedSignificantly(&status);
+  _storeCurrentValues(&status);
   wifiConnection(openHotspot);
   mqttSetup();
 }
@@ -104,7 +111,7 @@ void loop() {
   
   char buffer[256];
 
-  sprintf(buffer, "{\"GewaechshausTemperatur\": %.2f, \"GewaechshausLuftfeuchtigkeit\": %.2f, \"GewaechshausBatterieSpannung\": %.2f, \"Random\": %d}", status.insideTemperature, status.insideHumidity, status.batteryVoltage, random(255));
+  sprintf(buffer, "{\"GewaechshausTemperatur\": %.2f, \"GewaechshausLuftfeuchtigkeit\": %.2f, \"GewaechshausBatterieSpannung\": %.2f, \"Random\": %ld}", status.insideTemperature, status.insideHumidity, status.batteryVoltage, random(255));
   mqttPublish(buffer);
   delay(100);
   //mqttPublishStatus(&status);
