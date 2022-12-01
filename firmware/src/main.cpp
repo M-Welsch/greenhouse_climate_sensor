@@ -23,14 +23,27 @@
 #define SIGNIFICANT_DIFFERENCE_BATTERY_VOLTAGE 0.1
 #define FLASH_ADDRESS_OLD_VALUES 2
 
+#define BUTTON 13
+
 status_t status;
 BatteryMonitor batteryMonitor;
 Dht dht;
 Led led;
 
-void wifiConnection() {
+void wifiConnection(bool openHotspot) {
   WiFiManager wifiManager;
-  wifiManager.autoConnect(WIFI_HOTSPOT_NAME);
+  if (openHotspot) {
+    Serial.printf("opening hotspot with ssid %s\n", WIFI_HOTSPOT_NAME);
+    wifiManager.resetSettings();
+    wifiManager.setConfigPortalTimeout(600);
+    wifiManager.startConfigPortal(WIFI_HOTSPOT_NAME);
+  }
+  else {
+    Serial.printf("Trying to connect to saved wifi network\n");
+    wifiManager.setConfigPortalTimeout(1);      // basically don't open it at all ...
+    wifiManager.setConnectTimeout(30);
+    wifiManager.autoConnect(WIFI_HOTSPOT_NAME);
+  }
 }
 
 void _checkUndervoltage() {
@@ -67,16 +80,18 @@ void _storeCurrentValues(const status_t* const status) {
 
 void setup()
 {
+  Serial.begin(115200);
+  pinMode(BUTTON, INPUT_PULLUP);
+  bool openHotspot = !digitalRead(BUTTON);
   led.setup(LED_BUILTIN);
   led.off();
-  Serial.begin(115200);
   batteryMonitor.getVoltage(&status);
   _checkUndervoltage();
   dht.setup();
   dht.getValues(&status);
   //_haveValuesChangedSignificantly(&status);
   //_storeCurrentValues(&status);
-  wifiConnection();
+  wifiConnection(openHotspot);
   mqttSetup();
 }
 
@@ -89,7 +104,7 @@ void loop() {
   
   char buffer[256];
 
-  sprintf(buffer, "{\"GewaechshausTemperatur\": %.2f, \"GewaechshausLuftfeuchtigkeit\": %.2f, \"GewaechshausBatterieSpannung\": %.2f}", status.insideTemperature, status.insideHumidity, status.batteryVoltage);
+  sprintf(buffer, "{\"GewaechshausTemperatur\": %.2f, \"GewaechshausLuftfeuchtigkeit\": %.2f, \"GewaechshausBatterieSpannung\": %.2f, \"Random\": %d}", status.insideTemperature, status.insideHumidity, status.batteryVoltage, random(255));
   mqttPublish(buffer);
   delay(100);
   //mqttPublishStatus(&status);
