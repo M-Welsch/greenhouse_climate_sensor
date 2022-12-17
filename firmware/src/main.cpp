@@ -13,7 +13,7 @@
 #include "battery_monitor.h"
 #include "led.h"
 
-#define WIFI_HOTSPOT_NAME "Gewaechshaus_Sensor"
+#define WIFI_HOTSPOT_NAME "mobilerKlimasensor"
 
 #define FORCE_UPDATE_AFTER_X_BOOTUPS 10
 #define FLASH_ADDRESS_ACTIVATIONS_WITHOUT_UPDATE 64
@@ -21,7 +21,7 @@
 #define SIGNIFICANT_DIFFERENCE_TEMPERATURE 0.1
 #define SIGNIFICANT_DIFFERENCE_HUMIDITY 0.1
 #define SIGNIFICANT_DIFFERENCE_BATTERY_VOLTAGE 0.1
-#define FLASH_ADDRESS_OLD_VALUES 0
+#define FLASH_ADDRESS_OLD_VALUES 4096
 
 #define BUTTON 13
 
@@ -68,6 +68,7 @@ bool _hasValueChanged(float oldVal, float newVal, float maxDiff) {
 
 bool _haveValuesChangedSignificantly(const status_t* const status) {
   status_t oldValues;
+  EEPROM.begin(sizeof(status_t));
   EEPROM.get(FLASH_ADDRESS_OLD_VALUES, oldValues);
   Serial.printf("Last Values: T=%.2f, H=%.2f, Vb=%.2f\n", oldValues.insideTemperature, oldValues.insideHumidity, oldValues.batteryVoltage);
   bool tempChanged = _hasValueChanged(oldValues.insideTemperature, status->insideTemperature, SIGNIFICANT_DIFFERENCE_TEMPERATURE);
@@ -95,9 +96,8 @@ void setup()
   _checkUndervoltage();
   dht.setup();
   dht.getValues(&status);
-  EEPROM.begin(sizeof(status_t));
-  _haveValuesChangedSignificantly(&status);
-  _storeCurrentValues(&status);
+  //_haveValuesChangedSignificantly(&status);
+  //_storeCurrentValues(&status);
   wifiConnection(openHotspot);
   mqttSetup();
 }
@@ -111,9 +111,9 @@ void loop() {
   
   char buffer[256];
 
-  sprintf(buffer, "{\"GewaechshausTemperatur\": %.2f, \"GewaechshausLuftfeuchtigkeit\": %.2f, \"GewaechshausBatterieSpannung\": %.2f, \"Random\": %ld}", status.insideTemperature, status.insideHumidity, status.batteryVoltage, random(255));
+  sprintf(buffer, "{\"mobilerKlimaSensorTemperatur\": %.2f, \"mobilerKlimaSensorLuftfeuchtigkeit\": %.2f, \"mobilerKlimaSensorBatterieSpannung\": %.2f, \"Random\": %ld}", status.insideTemperature, status.insideHumidity, status.batteryVoltage, random(255));
   mqttPublish(buffer);
   delay(100);
   //mqttPublishStatus(&status);
-  ESP.deepSleep(300e6);  // reset after 5mins
+  ESP.deepSleep(60e6);  // reset after 1min
 }

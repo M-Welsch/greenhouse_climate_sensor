@@ -4,7 +4,7 @@
 #define mqtt_user "iot"
 #define mqtt_password "test123"
 
-#define topic "Gewaechshaus"
+#define topic "mobilerKlimaSensor"
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -58,13 +58,13 @@ void mqttPublishStatus(status_t *status) {
   buffer[0] = '\0';
   char tempBuffer[64];
   //sprintf(buffer, "{\"WaschkuecheTemperaturInnen\": %f}", status->insideTemperature, status->insideHumidity, status->insideDewPoint, status->outsideTemperature, status->outsideHumidity, status->outsideDewPoint);
-  jsonLine(tempBuffer, "GewaechshausTemperatur", status->insideTemperature, false);
+  jsonLine(tempBuffer, "mobilerKlimaSensorTemperatur", status->insideTemperature, false);
   sprintf(buffer, "%s%s", buffer, tempBuffer);
-  jsonLine(tempBuffer, "GewaechshausLuftfeuchtigkeit", status->insideHumidity, false);
+  jsonLine(tempBuffer, "mobilerKlimaSensorLuftfeuchtigkeit", status->insideHumidity, false);
   sprintf(buffer, "%s%s", buffer, tempBuffer);
-  jsonLine(tempBuffer, "GewaechshausTaupunkt", status->insideDewPoint, false);
+  jsonLine(tempBuffer, "mobilerKlimaSensorTaupunkt", status->insideDewPoint, false);
   sprintf(buffer, "%s%s", buffer, tempBuffer);
-  jsonLine(tempBuffer, "GewaechshausBatterieSpannung", status->batteryVoltage, true);
+  jsonLine(tempBuffer, "mobilerKlimaSensorBatterieSpannung", status->batteryVoltage, true);
   sprintf(buffer, "%s%s", buffer, tempBuffer);
   wrapIntoJson(buffer, buffer);
   client.publish(topic, buffer, true);
